@@ -1,198 +1,112 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Roblox ID Lookuper — AKT Tools</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Roblox ID Lookuper</title>
   <style>
-    :root{--bg:#0f1724;--card:#0b1220;--accent:#7c3aed;--muted:#9aa4b2;--glass:rgba(255,255,255,0.03)}
-    *{box-sizing:border-box;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial}
-    body{background:linear-gradient(180deg,#071122 0%, #071824 60%);color:#e6eef6;margin:0;padding:32px}
-    .container{max-width:980px;margin:0 auto}
-    header{display:flex;align-items:center;gap:16px;margin-bottom:20px}
-    header h1{margin:0;font-size:20px}
-    .card{background:var(--card);border-radius:12px;padding:18px;box-shadow:0 6px 24px rgba(2,6,23,0.6)}
-    .row{display:flex;gap:12px}
-    input[type=text]{flex:1;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:var(--glass);color:inherit}
-    button{background:var(--accent);border:none;padding:10px 14px;border-radius:8px;color:white;cursor:pointer}
-    .result{margin-top:14px;display:grid;grid-template-columns:140px 1fr;gap:12px;align-items:start}
-    .avatar{width:120px;height:120px;border-radius:8px;background:#061122;display:flex;align-items:center;justify-content:center;overflow:hidden}
-    .meta{color:var(--muted);font-size:13px}
-    .asset-img{max-width:240px;border-radius:8px;border:1px solid rgba(255,255,255,0.03)}
-    a.link{color:var(--accent);text-decoration:none}
-    .note{font-size:13px;color:var(--muted);margin-top:8px}
-    footer{margin-top:18px;color:var(--muted);font-size:13px}
-    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    .error{color:#ff8a8a}
-    @media(max-width:720px){.result{grid-template-columns:1fr;}.grid-2{grid-template-columns:1fr}}
+    body { font-family: sans-serif; background:#0f1724; color:#fff; margin:0; padding:20px; }
+    .card { background:#1b2333; padding:20px; border-radius:12px; max-width:800px; margin:auto; }
+    input { width:70%; padding:10px; border-radius:6px; border:none; margin-right:8px; }
+    button { padding:10px 16px; border:none; border-radius:6px; background:#7c3aed; color:#fff; cursor:pointer; }
+    .result { margin-top:20px; }
+    img { border-radius:8px; max-width:200px; margin-top:10px; }
+    .error { color: #ff6b6b; margin-top:10px; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <h1>Roblox ID Lookuper</h1>
-      <div class="meta">Paste a Roblox user or catalog URL (or just a username/ID)</div>
-    </header>
-
-    <div class="card">
-      <div class="row">
-        <input id="input" type="text" placeholder="e.g. https://www.roblox.com/users/12345678/profile or builderman or 156" />
-        <button id="lookupBtn">Lookup</button>
-      </div>
-      <div class="note">This is a static frontend that uses Roblox public APIs. Some Roblox endpoints may enforce CORS which can block requests on GitHub Pages — see the note below if you get CORS errors.</div>
-
-      <div id="output" class="result" style="display:none">
-        <div id="left"></div>
-        <div id="right"></div>
-      </div>
-
-      <div id="message" class="note"></div>
-
-      <div style="margin-top:14px">
-        <strong>How it works</strong>
-        <ul class="meta">
-          <li>Enter a Roblox user URL, username, or numeric userId to fetch profile info and avatar headshot.</li>
-          <li>Enter a catalog/asset URL (eg. /catalog/12345/Name) or numeric assetId to fetch asset info and thumbnail and a download link when possible.</li>
-        </ul>
-      </div>
-
-      <div class="note" style="margin-top:10px">If you plan to host this as a GitHub Pages site and you run into CORS blocks, either host a small server-side proxy (Netlify Functions, Vercel Serverless, or GitHub Actions) or run it locally with a CORS proxy while developing.</div>
-
-    </div>
-
-    <footer>Built for you — drop this file into a repo and enable GitHub Pages to publish. Want me to add a nicer design or React version? Ask!</footer>
+  <div class="card">
+    <h1>Roblox ID Lookuper</h1>
+    <p>Enter a Roblox username, user ID, or asset ID / URL.</p>
+    <input id="input" type="text" placeholder="e.g. builderman or https://www.roblox.com/users/156/profile">
+    <button id="lookupBtn">Lookup</button>
+    <div id="output" class="result"></div>
   </div>
 
   <script>
-    const input = document.getElementById('input');
-    const btn = document.getElementById('lookupBtn');
-    const output = document.getElementById('output');
-    const left = document.getElementById('left');
-    const right = document.getElementById('right');
-    const msg = document.getElementById('message');
+    const proxy = "https://your-vercel-app.vercel.app/api?url="; // 👈 replace with your proxy URL
 
-    btn.addEventListener('click', async ()=>{
-      clear();
-      const val = input.value.trim();
-      if(!val){ showMessage('Please enter a Roblox URL, username, or ID'); return; }
+    document.getElementById("lookupBtn").addEventListener("click", async () => {
+      const val = document.getElementById("input").value.trim();
+      const output = document.getElementById("output");
+      output.innerHTML = "";
 
-      // Try to parse as URL
-      try{
-        const url = new URL(val.startsWith('http')? val : 'https://'+val);
-        // Look for user patterns
-        if(/roblox\.com\/(users|users)\/([0-9]+)/i.test(url.pathname)){
-          const m = url.pathname.match(/users\/(\d+)/i);
-          if(m){ await showUser(m[1]); return; }
-        }
-        // catalog pattern
-        if(/roblox\.com\/(catalog|library)\/(\d+)/i.test(url.pathname)){
-          const m = url.pathname.match(/(?:catalog|library)\/(\d+)/i);
-          if(m){ await showAsset(m[1]); return; }
-        }
-        // profile with username (rare)
-        if(/roblox\.com\/users\/.*profile/i.test(url.pathname) && /users\/(\d+)/i.test(url.pathname)===false){
-          // fallback — drop the path and treat last segment as username
-        }
-      }catch(e){ /* not a valid URL, treat as plain input below */ }
+      if (!val) return output.innerHTML = "<p class='error'>Please enter something.</p>";
 
-      // If plain numeric => user id or asset id? We'll try user first, then asset
-      if(/^[0-9]+$/.test(val)){
-        // Try user
-        const id = val;
-        const ok = await showUser(id);
-        if(!ok){ await showAsset(id); }
-        return;
+      // detect numeric ID
+      if (/^[0-9]+$/.test(val)) {
+        return fetchUser(val);
       }
 
-      // Otherwise treat as username
-      await showUserByUsername(val);
+      // detect user URL
+      if (val.includes("roblox.com/users/")) {
+        const id = val.match(/users\\/(\\d+)/)?.[1];
+        if (id) return fetchUser(id);
+      }
+
+      // detect asset URL
+      if (val.includes("roblox.com/catalog/") || val.includes("roblox.com/library/")) {
+        const id = val.match(/(?:catalog|library)\\/(\\d+)/)?.[1];
+        if (id) return fetchAsset(id);
+      }
+
+      // otherwise assume username
+      fetchUserByName(val);
     });
 
-    function clear(){ output.style.display='none'; left.innerHTML=''; right.innerHTML=''; msg.textContent=''; }
-    function showMessage(t, isError=false){ msg.textContent=t; msg.className = isError? 'note error':'note'; }
-
-    async function showUserByUsername(username){
-      try{
-        showMessage('Looking up username: '+username+' ...');
-        const body = {usernames:[username], excludeBannedUsers:false};
-        const res = await fetch('https://users.roblox.com/v1/usernames/users', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-        if(!res.ok){ showMessage('Failed to lookup username — status '+res.status, true); return false; }
-        const j = await res.json();
-        if(j.data && j.data.length){ const id = j.data[0].id; return await showUser(id); }
-        showMessage('No user found for that username', true); return false;
-      }catch(err){ showMessage('Error fetching username: '+err.message, true); return false; }
+    async function fetchUserByName(username) {
+      const res = await fetch(proxy + "https://users.roblox.com/v1/usernames/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ usernames: [username], excludeBannedUsers: false })
+      });
+      if (!res.ok) return showError("Failed to fetch username.");
+      const data = await res.json();
+      if (data.data?.length) {
+        fetchUser(data.data[0].id);
+      } else showError("User not found.");
     }
 
-    async function showUser(id){
-      try{
-        showMessage('Fetching user info...');
-        const res = await fetch('https://users.roblox.com/v1/users/'+encodeURIComponent(id));
-        if(!res.ok){ showMessage('User not found (status '+res.status+')', true); return false; }
-        const data = await res.json();
-        output.style.display='grid';
-        left.innerHTML = `<div class="avatar"><img id="avatarImg" src="" alt="avatar" style="width:100%;height:100%;object-fit:cover"/></div>`;
-        right.innerHTML = `<h3>${escapeHtml(data.name)} <span style="color:var(--muted);font-size:13px">#${data.id}</span></h3>
-          <div class="meta">Display Name: ${escapeHtml(data.displayName || '')}</div>
-          <div class="meta">Created: ${new Date(data.created).toLocaleString()}</div>
-          <div class="meta">Description: ${escapeHtml(data.externalAppDisplayName || '')}</div>
-          <div style="margin-top:10px"><a class="link" href="https://www.roblox.com/users/${data.id}/profile" target="_blank">Open profile on Roblox</a></div>`;
+    async function fetchUser(id) {
+      const res = await fetch(proxy + "https://users.roblox.com/v1/users/" + id);
+      if (!res.ok) return showError("User not found.");
+      const user = await res.json();
 
-        // fetch headshot thumbnail
-        try{
-          const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${data.id}&size=420x420&format=Png&isCircular=false`);
-          if(thumbRes.ok){ const tj = await thumbRes.json(); const url = (tj.data && tj.data[0] && tj.data[0].imageUrl) ? tj.data[0].imageUrl : null; if(url) document.getElementById('avatarImg').src = url;
-            else document.getElementById('avatarImg').innerText = 'No image';
-          } else { document.getElementById('avatarImg').innerText = 'Thumbnail fetch failed'; }
-        }catch(e){ document.getElementById('avatarImg').innerText = 'Thumbnail error'; }
+      const thumb = await fetch(proxy + `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${id}&size=420x420&format=Png&isCircular=false`);
+      const t = await thumb.json();
+      const img = t.data?.[0]?.imageUrl || "";
 
-        showMessage('User fetched successfully');
-        return true;
-      }catch(err){ showMessage('Error fetching user: '+err.message, true); return false; }
+      document.getElementById("output").innerHTML = `
+        <h2>${user.name} (#${user.id})</h2>
+        <p>Display: ${user.displayName}</p>
+        <p>Created: ${new Date(user.created).toLocaleDateString()}</p>
+        ${img ? `<img src="${img}">` : ""}
+        <p><a href="https://roblox.com/users/${user.id}/profile" target="_blank">View on Roblox</a></p>
+      `;
     }
 
-    async function showAsset(id){
-      try{
-        showMessage('Fetching asset info...');
-        // Try economy API for details
-        const detailsRes = await fetch('https://economy.roblox.com/v2/assets/'+encodeURIComponent(id)+'/details');
-        if(!detailsRes.ok){ showMessage('Asset not found (status '+detailsRes.status+')', true); return false; }
-        const details = await detailsRes.json();
-        output.style.display='grid';
-        left.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px"><img id="assetImg" src="" class="asset-img" alt="asset"/><div style="display:flex;gap:8px"><a id="openAsset" class="link" target="_blank">Open on Roblox</a><button id="downloadBtn">Download image</button></div></div>`;
-        right.innerHTML = `<h3>${escapeHtml(details.name || 'Untitled')}</h3>
-          <div class="meta">Asset Id: ${details.id}</div>
-          <div class="meta">Creator: ${escapeHtml(details.creator && details.creator.name ? details.creator.name : (details.creator && details.creator.creatorTargetId) || '')}</div>
-          <div class="meta">Type: ${escapeHtml(details.assetType && details.assetType.name?details.assetType.name:'')}</div>
-          <div style="margin-top:8px" class="meta">${escapeHtml(details.description || '')}</div>`;
+    async function fetchAsset(id) {
+      const res = await fetch(proxy + "https://economy.roblox.com/v2/assets/" + id + "/details");
+      if (!res.ok) return showError("Asset not found.");
+      const asset = await res.json();
 
-        document.getElementById('openAsset').href = 'https://www.roblox.com/library/'+details.id;
-        document.getElementById('openAsset').textContent = 'Open on Roblox';
+      const thumb = await fetch(proxy + `https://thumbnails.roblox.com/v1/assets?assetIds=${id}&size=420x420&format=Png`);
+      const t = await thumb.json();
+      const img = t.data?.[0]?.imageUrl || "";
 
-        // Try thumbnails API for asset image
-        try{
-          const thumbRes = await fetch('https://thumbnails.roblox.com/v1/assets?assetIds='+encodeURIComponent(details.id)+'&size=420x420&format=Png&isCircular=false');
-          if(thumbRes.ok){ const tj = await thumbRes.json(); const url = (tj.data && tj.data[0] && tj.data[0].imageUrl)?tj.data[0].imageUrl:null; if(url) document.getElementById('assetImg').src = url;
-            else document.getElementById('assetImg').alt = 'No thumbnail available';
-
-            // wire download button
-            document.getElementById('downloadBtn').addEventListener('click', ()=>{
-              if(!url){ showMessage('No downloadable image found for this asset', true); return; }
-              // open in new tab to let user save
-              window.open(url, '_blank');
-            });
-          }else{
-            document.getElementById('assetImg').alt = 'Thumbnail fetch failed';
-          }
-        }catch(e){ document.getElementById('assetImg').alt = 'Thumbnail error'; }
-
-        showMessage('Asset fetched successfully');
-        return true;
-      }catch(err){ showMessage('Error fetching asset: '+err.message, true); return false; }
+      document.getElementById("output").innerHTML = `
+        <h2>${asset.name}</h2>
+        <p>ID: ${asset.id}</p>
+        <p>Creator: ${asset.creator?.name}</p>
+        <p>Type: ${asset.assetType?.name}</p>
+        ${img ? `<img src="${img}"><br><a href="${img}" download>Download Image</a>` : ""}
+        <p><a href="https://roblox.com/library/${asset.id}" target="_blank">View on Roblox</a></p>
+      `;
     }
 
-    // small helper
-    function escapeHtml(s){ if(!s && s!==0) return ''; return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"})[c]); }
-
+    function showError(msg) {
+      document.getElementById("output").innerHTML = `<p class="error">${msg}</p>`;
+    }
   </script>
 </body>
 </html>
